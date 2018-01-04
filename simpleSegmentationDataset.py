@@ -1,13 +1,14 @@
+import torch
+from torch.utils.data import Dataset
 import numpy as np
 import cv2
-from torch.utils.data import Dataset
 
 COLORS = ['#F44336',"#E91E63",'#9C27B0','#673AB7','#3F51B5','#2196F3','#03A9F4','#00BCD4','#4CAF50',
  '#8BC34A','#CDDC39','#FFEB3B','#FFC107','#FF9800','#FF5722']
 
 
 r_min = 12
-r_max = 48
+r_max = 36
 line_width_min = 2
 line_width_max = 4
 background_intensity = 30.0 / 255.0
@@ -63,7 +64,7 @@ def DrawRandomLine(img,segments,line_width_min,line_width_max,alpha):
     img = cv2.addWeighted(img, 1.0 - alpha, canvas, alpha, 0, img )
     return img,segments
 
-def generate(canvas_size, n_max, alpha = 0.5, noise_types=[]):
+def generateSegmentation(canvas_size, n_max, alpha = 0.5, noise_types=[]):
     canvas = background_intensity * np.ones((canvas_size,canvas_size,3))
     segments = np.zeros((canvas_size,canvas_size,3))
     for _ in range(np.random.choice(range(n_max))):
@@ -76,6 +77,20 @@ def generate(canvas_size, n_max, alpha = 0.5, noise_types=[]):
         canvas = noisy(t,canvas)
     return canvas,segments
 
+def generateClassification(canvas_size, alpha = 0.5, noise_types=[]):
+    canvas = background_intensity * np.ones((canvas_size,canvas_size,3))
+    segments = np.zeros((canvas_size,canvas_size,3))
+    label = np.random.choice(3)
+    if label ==0:
+        canvas,segments = DrawRandomCircle(canvas,segments,r_min,r_max,alpha)
+    elif label == 1:
+        canvas,segments = DrawRandomSquare(canvas,segments,r_min,r_max,alpha)
+    elif label == 2:
+        canvas,segments = DrawRandomLine(canvas,segments,line_width_min,line_width_max,alpha)
+    for t in noise_types:
+        canvas = noisy(t,canvas)
+    return canvas,label
+
 def stackSegments(segments):
     canvas = np.zeros((segments.shape[:2]))
     canvas += 1 * segments[:,:,0]
@@ -84,16 +99,42 @@ def stackSegments(segments):
     return canvas
 
 class SimpleSegmentationDataset(Dataset):
-    """A simple dataset for imgae segmentation purpose"""
-    def __init__(self, patch_size, n_max, alpha =1.0,virtual_size=1000):
+    """A simple dataset for image segmentation purpose"""
+    def __init__(self, patch_size, n_max, alpha =1.0,virtual_size=1000, stack=True):
         self.virtual_size = virtual_size
         self.patch_size = patch_size
         self.n_max = n_max
         self.alpha = alpha
+        self.stack = stack
 
     def __len__(self):
-        return len(self.virtual_size)
+        return self.virtual_size
 
     def __getitem__(self, idx):
-        return generate(self.patch_size, self.n_max, self.alpha)
+        x,y = generateSegmentation(self.patch_size, self.n_max, self.alpha)
+        x = x.transpose([2,0,1])
+        if self.stack:
+            y = stackSegments(y)
+            y = y[np.newaxis,:,:]
+        x = torch.from_numpy(x).float()
+        y = torch.from_numpy(y).float()
+        return x,y
+    
+class SimpleClassificationDataset(Dataset):
+    """A simple dataset for image classification purpose"""
+    def __init__(self, patch_size, alpha =1.0,virtual_size=1000):
+        self.virtual_size = virtual_size
+        self.patch_size = patch_size
+        self.alpha = alpha
+        
+    def __len__(self):
+        return self.virtual_size
+
+    def __getitem__(self, idx):
+        x,y = generateClassification(self.patch_size, self.alpha)
+        x = x.transpose([2,0,1])
+        x = torch.from_numpy(x).float()
+        #y = torch.from_numpy(y).long()
+        return x,y
+
 
