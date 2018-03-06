@@ -54,15 +54,20 @@ class Sinusoids(Dataset):
     A simple dataset for time-series modeling compatible with PyTorch torch.utils.data.Loader object
     
     Generate sinuoids with random phases and peridos
-    
-    Args:
-        num_steps (int): number of steps for each item
-        virtual_size (int): virtual size for the dataset
     """
 
-    def __init__(self,num_steps,virtual_size=1000):
-        self.t = np.linspace(-1,1,num_steps)
+    def __init__(self,num_steps,n_phases=1,virtual_size=1000, quantization=-1):
+        """
+        
+        Args:
+            num_steps (int): number of steps for each item
+            virtual_size (int): virtual size for the dataset
+            quantization (int): if > 0, quantize the output into the range [0,'quantization']
+        """
+            
+        self.t = np.linspace(-n_phases,n_phases,num_steps)
         self.virtual_size = virtual_size
+        self.quantization = quantization
 
     def __len__(self):
         return self.virtual_size
@@ -70,6 +75,9 @@ class Sinusoids(Dataset):
     def __getitem__(self, idx):
         z_1 = np.random.uniform(-1,1)
         z_2 = np.random.uniform(-1,1)
-        return np.expand_dims( gen_sinusoid(z_1,z_2,self.t) , 1)
+        data = np.expand_dims( gen_sinusoid(z_1,z_2,self.t) , 1)
+        if self.quantization > 0:
+            data = (self.quantization*data).astype(int)
+        return data
     
     
