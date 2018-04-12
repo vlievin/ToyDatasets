@@ -146,7 +146,12 @@ class SimpleSegmentationDataset(Dataset):
 
     def __getitem__(self, idx):
         x,y,_,_ = generateSegmentation(self.patch_size, self.n_max, self.alpha)
+        # none leayer for the segmentation
+        none_layer = (1 - (y.sum(2) > 0 )).astype(np.uint8)[:,:,np.newaxis]
+        y = np.concatenate([none_layer, y], axis = 2)
+        # Torch format
         x = x.transpose([2,0,1])
+        y = y.transpose([2,0,1])
         if self.stack:
             y = stackSegments(y)
             y = y[np.newaxis,:,:]
