@@ -7,8 +7,8 @@ COLORS = ['#F44336',"#E91E63",'#9C27B0','#673AB7','#3F51B5','#2196F3','#03A9F4',
  '#8BC34A','#CDDC39','#FFEB3B','#FFC107','#FF9800','#FF5722']
 
 
-r_min = 12
-r_max = 36
+R_MIN = 12
+R_MAX = 36
 line_width_min = 2
 line_width_max = 4
 background_intensity = 30.0 / 255.0
@@ -68,7 +68,8 @@ def DrawRandomLine(img,segments,line_width_min,line_width_max,alpha):
     box = [min(pts[:,0]),min(pts[:,1]), max(pts[:,0])-min(pts[:,0]), max(pts[:,1]) - min(pts[:,1]) ]
     return img,segments,box
 
-def generateSegmentation(canvas_size, n_max, alpha = 0.5, noise_types=[]):
+def generateSegmentation(canvas_size, n_max, alpha = 0.5, noise_types=[], r_min=R_MIN,r_max=R_MAX):
+    background_intensity = np.clip( np.random.normal(80.0 / 255.0, 40.0 / 255.0) , 0,1)
     canvas = background_intensity * np.ones((canvas_size,canvas_size,3))
     segments = np.zeros((canvas_size,canvas_size,3))
     boxes = []
@@ -134,7 +135,9 @@ def stackSegments(segments):
 
 class SimpleSegmentationDataset(Dataset):
     """A simple dataset for image segmentation purpose"""
-    def __init__(self, patch_size, n_max, alpha =1.0,virtual_size=1000, stack=True):
+    def __init__(self, patch_size, n_max, alpha =1.0,virtual_size=1000, stack=True, r_min=R_MIN, r_max=R_MAX):
+        self.r_min = r_min
+        self.r_max = r_max
         self.virtual_size = virtual_size
         self.patch_size = patch_size
         self.n_max = n_max
@@ -145,7 +148,7 @@ class SimpleSegmentationDataset(Dataset):
         return self.virtual_size
 
     def __getitem__(self, idx):
-        x,y,_,_ = generateSegmentation(self.patch_size, self.n_max, self.alpha)
+        x,y,_,_ = generateSegmentation(self.patch_size, self.n_max, self.alpha,r_min=self.r_min,r_max=self.r_max)
         # none leayer for the segmentation
         none_layer = (1 - (y.sum(2) > 0 )).astype(np.uint8)[:,:,np.newaxis]
         y = np.concatenate([none_layer, y], axis = 2)
